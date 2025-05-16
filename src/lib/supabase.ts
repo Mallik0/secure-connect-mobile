@@ -2,8 +2,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
-const supabaseUrl = 'YOUR_SUPABASE_URL'; // Replace with your Supabase URL after setting up
-const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your Supabase anon key after setting up
+// These placeholder URLs have proper URL format so they won't throw errors
+// Replace these with your actual Supabase credentials when you have them
+const supabaseUrl = 'https://your-project-id.supabase.co'; 
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdXItcHJvamVjdC1pZCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjE2NDExNDgyLCJleHAiOjE5MzE5ODc0ODJ9.placeholder-key';
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
