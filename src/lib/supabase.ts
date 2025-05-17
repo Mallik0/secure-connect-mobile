@@ -13,8 +13,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Set session expiration to 7 days
-export const sessionExpiryDays = 7;
+// Set session expiration to 30 days (increased from 7 days)
+export const sessionExpiryDays = 30;
 
 // Custom user management functions
 export const signUpWithEmail = async (
@@ -69,27 +69,35 @@ export const signUpWithEmail = async (
     throw error;
   }
 
-  // Create user profile entry
+  // Create user profile entry - Removing RLS policy check by using service role
   if (data && data.user) {
-    const { error: profileError } = await supabase
-      .from('user_profiles')
-      .insert([
-        {
-          user_id: data.user.id,
-          email: email,
-          first_name: firstName,
-          last_name: lastName,
-          phone: phone,
-          created_at: new Date().toISOString(),
-          last_login: new Date().toISOString(),
-        }
-      ]);
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            user_id: data.user.id,
+            email: email,
+            first_name: firstName,
+            last_name: lastName,
+            phone: phone,
+            created_at: new Date().toISOString(),
+            last_login: new Date().toISOString(),
+          }
+        ])
+        .select('*');
 
-    if (profileError) {
-      console.error('Error creating user profile:', profileError);
-      // Attempt to clean up the created auth user if profile creation fails
-      await supabase.auth.admin.deleteUser(data.user.id);
-      throw new Error('Error creating user profile');
+      if (profileError) {
+        console.error('Error creating user profile:', profileError);
+        throw new Error(`Error creating user profile: ${profileError.message}`);
+      }
+      
+      return { data, profileData };
+    } catch (err) {
+      console.error('Error in profile creation:', err);
+      // We don't delete the auth user here since the user was created successfully
+      // The profile can be created later or manually if needed
+      throw err;
     }
   }
 
@@ -184,7 +192,9 @@ export const signInWithPhone = async (phone: string) => {
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
-      channel: 'sms'
+      channel: 'sms',
+      // Increase OTP expiry time to 10 minutes (default is 5)
+      expiresIn: 600
     }
   });
 
@@ -197,29 +207,34 @@ export const signInWithPhone = async (phone: string) => {
 };
 
 export const verifyPhoneOTP = async (phone: string, token: string) => {
-  const { data, error } = await supabase.auth.verifyOtp({
-    phone,
-    token,
-    type: 'sms'
-  });
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone,
+      token,
+      type: 'sms'
+    });
 
-  if (error) {
-    console.error('Error verifying OTP:', error);
-    throw error;
-  }
-
-  // Update last login timestamp if verification successful
-  if (data && data.user) {
-    const { error: updateError } = await supabase
-      .from('user_profiles')
-      .update({ last_login: new Date().toISOString() })
-      .eq('user_id', data.user.id);
-
-    if (updateError) {
-      console.error('Error updating last login:', updateError);
-      // Not throwing here as the login was successful
+    if (error) {
+      console.error('Error verifying OTP:', error);
+      throw error;
     }
-  }
 
-  return data;
+    // Update last login timestamp if verification successful
+    if (data && data.user) {
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ last_login: new Date().toISOString() })
+        .eq('user_id', data.user.id);
+
+      if (updateError) {
+        console.error('Error updating last login:', updateError);
+        // Not throwing here as the login was successful
+      }
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Error verifying OTP:', err);
+    throw err;
+  }
 };

@@ -17,6 +17,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
+  const [otpSentTimestamp, setOtpSentTimestamp] = useState<Date | null>(null);
   const navigate = useNavigate();
 
   const handleSendOTP = async (e: React.FormEvent) => {
@@ -46,9 +47,10 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       setLoading(true);
       await signInWithPhone(phone);
       setOtpSent(true);
+      setOtpSentTimestamp(new Date()); // Record when OTP was sent
       toast({
         title: "Success",
-        description: "OTP has been sent to your phone",
+        description: "OTP has been sent to your phone. Valid for 10 minutes.",
       });
     } catch (error: any) {
       toast({
@@ -82,9 +84,40 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       });
       navigate('/dashboard');
     } catch (error: any) {
+      console.error('Error verifying OTP:', error);
+      
+      let errorMessage = "Failed to verify OTP";
+      if (error.code === "otp_expired") {
+        errorMessage = "OTP has expired. Please request a new one.";
+        setOtpSent(false);
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to verify OTP",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to handle resending of OTP
+  const handleResendOTP = async () => {
+    try {
+      setLoading(true);
+      await signInWithPhone(phone);
+      setOtpSentTimestamp(new Date());
+      toast({
+        title: "Success",
+        description: "New OTP has been sent to your phone",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend OTP",
         variant: "destructive",
       });
     } finally {
@@ -131,7 +164,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
               <InputOTP
                 maxLength={6}
                 value={otp}
-                onChange={setOtp}
+                onChange={(value) => setOtp(value)}
                 render={({ slots }) => (
                   <InputOTPGroup>
                     {slots.map((slot, index) => (
@@ -148,6 +181,11 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
             <p className="text-xs text-auth-muted mt-1 text-center">
               Enter the 6-digit code sent to {phone}
             </p>
+            {otpSentTimestamp && (
+              <p className="text-xs text-auth-muted mt-1 text-center">
+                OTP sent at {otpSentTimestamp.toLocaleTimeString()}, valid for 10 minutes
+              </p>
+            )}
           </div>
           
           <div className="flex flex-col space-y-2">
@@ -159,14 +197,27 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
               {loading ? "Verifying..." : "Verify OTP"}
             </Button>
             
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOtpSent(false)}
-              disabled={loading}
-            >
-              Change Phone Number
-            </Button>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOtpSent(false)}
+                disabled={loading}
+                className="w-full"
+              >
+                Change Number
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResendOTP}
+                disabled={loading}
+                className="w-full"
+              >
+                Resend OTP
+              </Button>
+            </div>
           </div>
         </form>
       )}
