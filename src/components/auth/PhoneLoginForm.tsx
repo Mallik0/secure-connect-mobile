@@ -135,7 +135,11 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
                 render={({ slots }) => (
                   <InputOTPGroup>
                     {slots.map((slot, index) => (
-                      <InputOTPSlot key={index} index={index} {...slot} />
+                      <InputOTPSlot 
+                        key={index} 
+                        index={index} 
+                        className={slot.char ? "border-primary" : ""}
+                      />
                     ))}
                   </InputOTPGroup>
                 )}
