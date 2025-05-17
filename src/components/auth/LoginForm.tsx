@@ -4,17 +4,18 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Phone } from 'lucide-react';
 
 type LoginFormProps = {
   onToggleForm: () => void;
+  onPhoneLogin: () => void;
 };
 
-const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm, onPhoneLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, loading } = useAuth();
+  const { signIn, loading, error } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +23,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
     if (!email || !password) {
       toast({
         title: "Error",
-        description: "Please enter both email and password",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
@@ -30,22 +31,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
 
     try {
       await signIn(email, password);
-      toast({
-        title: "Success",
-        description: "You have successfully logged in",
-      });
+      // Successful login will redirect via useEffect in the Auth component
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to sign in",
-        variant: "destructive",
-      });
+      // Error is already handled in the AuthContext
     }
   };
 
   return (
     <div className="auth-card">
-      <h2 className="auth-title">Welcome Back</h2>
+      <h2 className="auth-title">Sign In</h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label htmlFor="email" className="auth-label">Email</label>
@@ -89,8 +83,21 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
           className="auth-button"
           disabled={loading}
         >
-          {loading ? "Signing in..." : "Sign In"}
+          {loading ? "Signing In..." : "Sign In"}
         </Button>
+        
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="outline" 
+            className="w-full flex items-center justify-center"
+            onClick={onPhoneLogin}
+            disabled={loading}
+          >
+            <Phone className="mr-2 h-4 w-4" />
+            Sign In with Phone
+          </Button>
+        </div>
       </form>
       
       <div className="mt-4 text-center">

@@ -2,13 +2,16 @@
 import React, { useState } from 'react';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
+import PhoneLoginForm from '../components/auth/PhoneLoginForm';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useEffect } from 'react';
 import { Loader } from 'lucide-react';
 
+type AuthMode = 'login' | 'register' | 'phone';
+
 const Auth: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   
@@ -37,10 +40,19 @@ const Auth: React.FC = () => {
           <p className="mt-2 text-auth-muted">Your trusted authentication service</p>
         </div>
 
-        {isLogin ? (
-          <LoginForm onToggleForm={() => setIsLogin(false)} />
-        ) : (
-          <RegisterForm onToggleForm={() => setIsLogin(true)} />
+        {authMode === 'login' && (
+          <LoginForm 
+            onToggleForm={() => setAuthMode('register')} 
+            onPhoneLogin={() => setAuthMode('phone')}
+          />
+        )}
+        
+        {authMode === 'register' && (
+          <RegisterForm onToggleForm={() => setAuthMode('login')} />
+        )}
+        
+        {authMode === 'phone' && (
+          <PhoneLoginForm onToggleForm={() => setAuthMode('login')} />
         )}
       </div>
     </div>

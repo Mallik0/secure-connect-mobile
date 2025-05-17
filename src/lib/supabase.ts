@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
@@ -178,4 +177,49 @@ export const checkSessionValidity = async () => {
   }
   
   return false;
+};
+
+// Phone authentication functions
+export const signInWithPhone = async (phone: string) => {
+  const { data, error } = await supabase.auth.signInWithOtp({
+    phone,
+    options: {
+      channel: 'sms'
+    }
+  });
+
+  if (error) {
+    console.error('Error sending OTP:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const verifyPhoneOTP = async (phone: string, token: string) => {
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone,
+    token,
+    type: 'sms'
+  });
+
+  if (error) {
+    console.error('Error verifying OTP:', error);
+    throw error;
+  }
+
+  // Update last login timestamp if verification successful
+  if (data && data.user) {
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ last_login: new Date().toISOString() })
+      .eq('user_id', data.user.id);
+
+    if (updateError) {
+      console.error('Error updating last login:', updateError);
+      // Not throwing here as the login was successful
+    }
+  }
+
+  return data;
 };
