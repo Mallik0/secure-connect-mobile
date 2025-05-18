@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
 import { Eye, EyeOff, Phone } from 'lucide-react';
+import { Alert, AlertDescription } from '../ui/alert';
 
 type LoginFormProps = {
   onToggleForm: () => void;
@@ -15,10 +16,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm, onPhoneLogin }) => 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, loading, error } = useAuth();
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const { signIn, loading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     
     if (!email || !password) {
       toast({
@@ -33,13 +36,35 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm, onPhoneLogin }) => 
       await signIn(email, password);
       // Successful login will redirect via useEffect in the Auth component
     } catch (error: any) {
-      // Error is already handled in the AuthContext
+      console.error("Login error:", error);
+      
+      // Check for specific errors
+      if (error.message.includes("Invalid login credentials")) {
+        setLoginError("The email or password you entered is incorrect. If you haven't registered yet, please create an account.");
+      } else if (error.message.includes("Email not confirmed")) {
+        setLoginError("Please check your email inbox and confirm your email address before signing in.");
+      } else {
+        setLoginError(error.message || "An error occurred during sign in. Please try again.");
+      }
+      
+      toast({
+        title: "Sign In Failed",
+        description: "Please check your credentials or create an account",
+        variant: "destructive",
+      });
     }
   };
 
   return (
     <div className="auth-card">
       <h2 className="auth-title">Sign In</h2>
+      
+      {loginError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{loginError}</AlertDescription>
+        </Alert>
+      )}
+      
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label htmlFor="email" className="auth-label">Email</label>

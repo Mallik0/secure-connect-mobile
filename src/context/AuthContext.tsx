@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { 
   supabase, 
   getCurrentUser, 
@@ -32,18 +32,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const authCheckCompleted = useRef(false);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        if (authCheckCompleted.current) return;
+        
         setLoading(true);
         setError(null);
         
-        // Check if session is valid based on 7-day expiry
+        // Check if session is valid based on session expiry
         const isSessionValid = await checkSessionValidity();
         if (!isSessionValid) {
           setUser(null);
           setLoading(false);
+          authCheckCompleted.current = true;
           return;
         }
         
@@ -79,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
       } finally {
         setLoading(false);
+        authCheckCompleted.current = true;
       }
     };
 
@@ -86,12 +91,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        console.log('Auth state changed:', event);
+        
         if (event === 'SIGNED_OUT') {
           setUser(null);
         } else if (event === 'SIGNED_IN' && session?.user) {
-          // Update user state after sign in
-          checkAuth();
+          // We'll update user state using setTimeout to prevent rapid refreshes
+          setTimeout(async () => {
+            try {
+              const { data, error: profileError } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .single();
+                
+              if (profileError || !data) {
+                console.error('Error fetching user profile:', profileError);
+                setUser(null);
+              } else {
+                setUser({
+                  id: session.user.id,
+                  email: data.email,
+                  firstName: data.first_name,
+                  lastName: data.last_name,
+                  phone: data.phone
+                });
+              }
+            } catch (err) {
+              console.error('Error updating user after sign in:', err);
+            }
+          }, 0);
         }
       }
     );
