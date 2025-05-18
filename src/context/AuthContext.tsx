@@ -33,12 +33,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const authCheckCompleted = useRef(false);
+  const initialCheckDone = useRef(false);
+  const processingAuthChange = useRef(false);
 
+  // Initial auth check - only runs once
   useEffect(() => {
     const checkAuth = async () => {
+      if (initialCheckDone.current) return;
+      initialCheckDone.current = true;
+      
       try {
-        if (authCheckCompleted.current) return;
-        
         setLoading(true);
         setError(null);
         
@@ -47,7 +51,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!isSessionValid) {
           setUser(null);
           setLoading(false);
-          authCheckCompleted.current = true;
           return;
         }
         
@@ -83,45 +86,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
       } finally {
         setLoading(false);
-        authCheckCompleted.current = true;
       }
     };
 
     checkAuth();
+  }, []);
 
+  // Auth state changes subscription
+  useEffect(() => {
     // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth state changed:', event);
         
+        // Avoid multiple rapid state changes
+        if (processingAuthChange.current) {
+          console.log('Already processing auth change, skipping duplicate event');
+          return;
+        }
+        
+        processingAuthChange.current = true;
+        
         if (event === 'SIGNED_OUT') {
           setUser(null);
+          processingAuthChange.current = false;
         } else if (event === 'SIGNED_IN' && session?.user) {
-          // We'll update user state using setTimeout to prevent rapid refreshes
+          // Delay auth state update to prevent rapid successive updates
           setTimeout(async () => {
             try {
-              const { data, error: profileError } = await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .single();
-                
-              if (profileError || !data) {
-                console.error('Error fetching user profile:', profileError);
-                setUser(null);
-              } else {
-                setUser({
-                  id: session.user.id,
-                  email: data.email,
-                  firstName: data.first_name,
-                  lastName: data.last_name,
-                  phone: data.phone
-                });
+              // Only fetch profile if we need to (if user is null or id changed)
+              if (!user || user.id !== session.user.id) {
+                const { data, error: profileError } = await supabase
+                  .from('user_profiles')
+                  .select('*')
+                  .eq('user_id', session.user.id)
+                  .single();
+                  
+                if (profileError || !data) {
+                  console.error('Error fetching user profile:', profileError);
+                  setUser(null);
+                } else {
+                  setUser({
+                    id: session.user.id,
+                    email: data.email,
+                    firstName: data.first_name,
+                    lastName: data.last_name,
+                    phone: data.phone
+                  });
+                }
               }
             } catch (err) {
               console.error('Error updating user after sign in:', err);
+            } finally {
+              processingAuthChange.current = false;
             }
-          }, 0);
+          }, 100); // Add a delay to prevent multiple rapid auth changes
+        } else {
+          processingAuthChange.current = false;
         }
       }
     );
@@ -129,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [user]);
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string, phone: string) => {
     try {
