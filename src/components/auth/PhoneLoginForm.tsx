@@ -1,16 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Phone, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
-import { Phone, ArrowLeft } from 'lucide-react';
-import { supabase, signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
-
+import { signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "../ui/input-otp";
+  InputOTPSeparator
+} from '../ui/input-otp';
 
 type PhoneLoginFormProps = {
   onToggleForm: () => void;
@@ -18,29 +18,34 @@ type PhoneLoginFormProps = {
 
 const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
   const [phone, setPhone] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [allowResend, setAllowResend] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [resending, setResending] = useState(false);
 
-  const startCountdown = () => {
-    setAllowResend(false);
-    setCountdown(60); // 60 seconds countdown
-    
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setAllowResend(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  // Handle the countdown timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
+  // Format seconds into mm:ss
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleSendOTP = async (e: React.FormEvent) => {
+  const validatePhone = (phoneNumber: string): boolean => {
+    // Basic phone validation - should start with + and contain 10-15 digits
+    const phoneRegex = /^\+[0-9]{10,15}$/;
+    return phoneRegex.test(phoneNumber);
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!phone) {
@@ -51,114 +56,122 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       });
       return;
     }
-
-    // Simple phone number validation
-    const phonePattern = /^\+?[0-9]{10,15}$/;
-    if (!phonePattern.test(phone)) {
+    
+    if (!validatePhone(phone)) {
       toast({
         title: "Error",
-        description: "Please enter a valid phone number (e.g., +1234567890)",
+        description: "Please enter a valid phone number in format +1234567890",
         variant: "destructive",
       });
       return;
     }
-
+    
     try {
       setLoading(true);
       await signInWithPhone(phone);
-      setOtpSent(true);
-      startCountdown();
-      toast({
-        title: "OTP Sent",
-        description: "A verification code has been sent to your phone.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send verification code",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!otp || otp.length !== 6) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid 6-digit verification code",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await verifyPhoneOTP(phone, otp);
+      setIsOtpSent(true);
+      setCountdown(600); // 10 minutes expiry
       toast({
         title: "Success",
-        description: "Phone number verified successfully!",
+        description: "OTP sent to your phone",
       });
-      // Redirect will happen automatically via the Auth component
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to verify code",
+        description: error.message || "Failed to send OTP",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
-
-  const handleResendOTP = async () => {
-    if (!allowResend) return;
+  
+  const handleResendOtp = async () => {
+    if (countdown > 0) return;
     
     try {
-      setLoading(true);
+      setResending(true);
       await signInWithPhone(phone);
-      startCountdown();
+      setCountdown(600); // 10 minutes expiry
       toast({
-        title: "OTP Resent",
-        description: "A new verification code has been sent to your phone.",
+        title: "Success",
+        description: "OTP sent to your phone",
       });
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to send verification code",
+        description: error.message || "Failed to resend OTP",
+        variant: "destructive",
+      });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!otpToken || otpToken.length !== 6) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid OTP",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await verifyPhoneOTP(phone, otpToken);
+      toast({
+        title: "Success",
+        description: "Phone number verified successfully",
+      });
+      // Successful verification will trigger auth state change
+      // Auth context will handle redirect
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to verify OTP",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Allow only digits and + character
+    const value = e.target.value;
+    if (value === '' || value === '+' || /^\+[0-9]*$/.test(value)) {
+      setPhone(value);
+    }
+  };
+  
+  const handleOtpChange = (value: string) => {
+    setOtpToken(value);
   };
 
   return (
     <div className="auth-card">
       <h2 className="auth-title">Sign In with Phone</h2>
       
-      {!otpSent ? (
-        <form onSubmit={handleSendOTP}>
+      {!isOtpSent ? (
+        <form onSubmit={handleSendOtp}>
           <div className="mb-6">
             <label htmlFor="phone" className="auth-label">Phone Number</label>
-            <div className="flex items-center">
-              <Phone className="absolute ml-3 text-gray-400" size={18} />
-              <Input
-                id="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1234567890"
-                className="auth-input pl-10"
-                disabled={loading}
-                required
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              Format: +[country code][phone number]
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={handlePhoneChange}
+              placeholder="+1234567890"
+              className="auth-input"
+              disabled={loading}
+              required
+            />
+            <p className="text-sm text-muted-foreground mt-1">
+              Include country code (e.g., +1 for US)
             </p>
           </div>
           
@@ -167,63 +180,87 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
             className="auth-button"
             disabled={loading}
           >
-            {loading ? "Sending Code..." : "Send Verification Code"}
+            {loading ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending OTP...</>
+            ) : (
+              <>Send OTP</>
+            )}
           </Button>
         </form>
       ) : (
-        <form onSubmit={handleVerifyOTP}>
+        <form onSubmit={handleVerifyOtp}>
           <div className="mb-6">
-            <label htmlFor="otp" className="auth-label">Verification Code</label>
-            <div className="flex justify-center my-4">
-              <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
+            <div className="flex justify-between items-center mb-2">
+              <label htmlFor="otp" className="auth-label">Verification Code (OTP)</label>
+              {countdown > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  Expires in {formatTime(countdown)}
+                </span>
+              )}
             </div>
             
-            {countdown > 0 && (
-              <p className="text-center text-sm text-gray-500 mt-2">
-                Resend code in {countdown} seconds
-              </p>
-            )}
+            <InputOTP
+              value={otpToken}
+              onChange={handleOtpChange}
+              maxLength={6}
+              render={({ slots }) => (
+                <InputOTPGroup>
+                  {slots.map((slot, index) => (
+                    <React.Fragment key={index}>
+                      <InputOTPSlot index={index} className="w-10 h-10" />
+                      {index !== slots.length - 1 && index % 3 === 2 && (
+                        <InputOTPSeparator />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </InputOTPGroup>
+              )}
+            />
             
-            {allowResend && (
-              <button
-                type="button"
-                onClick={handleResendOTP}
-                className="text-center w-full text-sm text-auth-primary mt-2 hover:underline"
-                disabled={loading}
-              >
-                Resend verification code
-              </button>
-            )}
+            <div className="text-center mt-2">
+              <p className="text-sm">
+                {countdown === 0 ? (
+                  <Button 
+                    type="button" 
+                    variant="link" 
+                    onClick={handleResendOtp}
+                    disabled={resending}
+                    className="p-0 h-auto"
+                  >
+                    {resending ? 'Resending...' : 'Resend OTP'}
+                  </Button>
+                ) : (
+                  <span className="text-muted-foreground">OTP sent to {phone}</span>
+                )}
+              </p>
+            </div>
           </div>
           
           <Button
             type="submit"
             className="auth-button"
-            disabled={loading}
+            disabled={loading || otpToken.length !== 6}
           >
-            {loading ? "Verifying..." : "Verify"}
+            {loading ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</>
+            ) : (
+              <>Verify OTP</>
+            )}
           </Button>
         </form>
       )}
       
-      <div className="mt-4 text-center">
-        <button 
-          onClick={otpSent ? () => setOtpSent(false) : onToggleForm} 
-          className="flex items-center justify-center mx-auto text-auth-muted hover:text-auth-text"
+      <div className="mt-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full flex items-center justify-center"
+          onClick={onToggleForm}
           disabled={loading}
         >
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          {otpSent ? "Change Phone Number" : "Back to Email Sign In"}
-        </button>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Email Login
+        </Button>
       </div>
     </div>
   );

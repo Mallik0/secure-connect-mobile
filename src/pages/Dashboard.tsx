@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { toast } from '../components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { sessionExpiryDays } from '../lib/supabase';
 
 const Dashboard: React.FC = () => {
   const { user, logout, loading } = useAuth();
@@ -54,7 +55,7 @@ const Dashboard: React.FC = () => {
             
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-medium text-auth-text mb-2">Account Security</h3>
-              <p className="text-sm text-auth-muted mb-3">Your session will automatically expire after 7 days of inactivity.</p>
+              <p className="text-sm text-auth-muted mb-3">Your session will automatically expire after {sessionExpiryDays} days of inactivity.</p>
               <Button 
                 variant="outline" 
                 className="w-full" 

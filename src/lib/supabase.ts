@@ -24,32 +24,8 @@ export const signUpWithEmail = async (
   lastName: string, 
   phone: string
 ) => {
-  // Check if email or phone already exists
-  const { data: existingUsers, error: queryError } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .or(`email.eq.${email},phone.eq.${phone}`);
-
-  if (queryError) {
-    console.error('Error checking existing users:', queryError);
-    throw new Error('Error checking user data');
-  }
-
-  if (existingUsers && existingUsers.length > 0) {
-    // Check if email exists
-    const emailExists = existingUsers.some(user => user.email === email);
-    if (emailExists) {
-      throw new Error('Email already in use');
-    }
-    
-    // Check if phone exists
-    const phoneExists = existingUsers.some(user => user.phone === phone);
-    if (phoneExists) {
-      throw new Error('Phone number already in use');
-    }
-  }
-
-  // Create the new user
+  // Create the new user - we no longer need to check for existing users
+  // as the trigger will handle profile creation
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -69,8 +45,6 @@ export const signUpWithEmail = async (
     throw error;
   }
 
-  // We'll return success here and let the automatic trigger handle profile creation
-  // This avoids RLS policy issues when creating the profile directly
   return data;
 };
 
@@ -163,7 +137,7 @@ export const signInWithPhone = async (phone: string) => {
     phone,
     options: {
       channel: 'sms',
-      // OTP expiry time - setting channel options properly, removing expiresIn
+      // Removed expiresIn parameter as it's not supported in this context
     }
   });
 
