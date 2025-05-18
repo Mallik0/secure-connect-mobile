@@ -163,8 +163,7 @@ export const signInWithPhone = async (phone: string) => {
     phone,
     options: {
       channel: 'sms',
-      // OTP expiry time - 10 minutes
-      expiresIn: 600
+      // OTP expiry time - setting channel options properly, removing expiresIn
     }
   });
 

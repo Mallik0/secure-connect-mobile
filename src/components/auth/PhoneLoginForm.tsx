@@ -1,12 +1,16 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
-import { signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '../ui/input-otp';
-import { Label } from '../ui/label';
+import { Phone, ArrowLeft } from 'lucide-react';
+import { supabase, signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
+
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "../ui/input-otp";
 
 type PhoneLoginFormProps = {
   onToggleForm: () => void;
@@ -14,11 +18,27 @@ type PhoneLoginFormProps = {
 
 const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
   const [phone, setPhone] = useState('');
-  const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
-  const [otpSentTimestamp, setOtpSentTimestamp] = useState<Date | null>(null);
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [allowResend, setAllowResend] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  const startCountdown = () => {
+    setAllowResend(false);
+    setCountdown(60); // 60 seconds countdown
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setAllowResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +46,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
     if (!phone) {
       toast({
         title: "Error",
-        description: "Please enter a phone number",
+        description: "Please enter your phone number",
         variant: "destructive",
       });
       return;
@@ -37,7 +57,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
     if (!phonePattern.test(phone)) {
       toast({
         title: "Error",
-        description: "Please enter a valid phone number with country code (e.g., +1234567890)",
+        description: "Please enter a valid phone number (e.g., +1234567890)",
         variant: "destructive",
       });
       return;
@@ -47,15 +67,15 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       setLoading(true);
       await signInWithPhone(phone);
       setOtpSent(true);
-      setOtpSentTimestamp(new Date()); // Record when OTP was sent
+      startCountdown();
       toast({
-        title: "Success",
-        description: "OTP has been sent to your phone. Valid for 10 minutes.",
+        title: "OTP Sent",
+        description: "A verification code has been sent to your phone.",
       });
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to send OTP",
+        description: error.message || "Failed to send verification code",
         variant: "destructive",
       });
     } finally {
@@ -69,7 +89,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
     if (!otp || otp.length !== 6) {
       toast({
         title: "Error",
-        description: "Please enter a valid 6-digit OTP",
+        description: "Please enter a valid 6-digit verification code",
         variant: "destructive",
       });
       return;
@@ -80,23 +100,13 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       await verifyPhoneOTP(phone, otp);
       toast({
         title: "Success",
-        description: "Phone number verified successfully",
+        description: "Phone number verified successfully!",
       });
-      navigate('/dashboard');
+      // Redirect will happen automatically via the Auth component
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      
-      let errorMessage = "Failed to verify OTP";
-      if (error.code === "otp_expired") {
-        errorMessage = "OTP has expired. Please request a new one.";
-        setOtpSent(false);
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error.message || "Failed to verify code",
         variant: "destructive",
       });
     } finally {
@@ -104,20 +114,21 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
     }
   };
 
-  // Function to handle resending of OTP
   const handleResendOTP = async () => {
+    if (!allowResend) return;
+    
     try {
       setLoading(true);
       await signInWithPhone(phone);
-      setOtpSentTimestamp(new Date());
+      startCountdown();
       toast({
-        title: "Success",
-        description: "New OTP has been sent to your phone",
+        title: "OTP Resent",
+        description: "A new verification code has been sent to your phone.",
       });
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to resend OTP",
+        description: error.message || "Failed to send verification code",
         variant: "destructive",
       });
     } finally {
@@ -127,24 +138,27 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
 
   return (
     <div className="auth-card">
-      <h2 className="auth-title">Login with Phone</h2>
+      <h2 className="auth-title">Sign In with Phone</h2>
       
       {!otpSent ? (
         <form onSubmit={handleSendOTP}>
-          <div className="mb-4">
+          <div className="mb-6">
             <label htmlFor="phone" className="auth-label">Phone Number</label>
-            <Input
-              id="phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1234567890"
-              className="auth-input"
-              disabled={loading}
-              required
-            />
-            <p className="text-xs text-auth-muted mt-1">
-              Include country code (e.g., +1 for US)
+            <div className="flex items-center">
+              <Phone className="absolute ml-3 text-gray-400" size={18} />
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1234567890"
+                className="auth-input pl-10"
+                disabled={loading}
+                required
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Format: +[country code][phone number]
             </p>
           </div>
           
@@ -153,82 +167,63 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
             className="auth-button"
             disabled={loading}
           >
-            {loading ? "Sending OTP..." : "Send OTP"}
+            {loading ? "Sending Code..." : "Send Verification Code"}
           </Button>
         </form>
       ) : (
         <form onSubmit={handleVerifyOTP}>
           <div className="mb-6">
-            <Label htmlFor="otp" className="auth-label mb-2 block">Enter OTP</Label>
-            <div className="flex justify-center mb-2">
-              <InputOTP
-                maxLength={6}
-                value={otp}
-                onChange={(value) => setOtp(value)}
-                render={({ slots }) => (
-                  <InputOTPGroup>
-                    {slots.map((slot, index) => (
-                      <InputOTPSlot 
-                        key={index} 
-                        index={index} 
-                        className={slot.char ? "border-primary" : ""}
-                      />
-                    ))}
-                  </InputOTPGroup>
-                )}
-              />
+            <label htmlFor="otp" className="auth-label">Verification Code</label>
+            <div className="flex justify-center my-4">
+              <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
             </div>
-            <p className="text-xs text-auth-muted mt-1 text-center">
-              Enter the 6-digit code sent to {phone}
-            </p>
-            {otpSentTimestamp && (
-              <p className="text-xs text-auth-muted mt-1 text-center">
-                OTP sent at {otpSentTimestamp.toLocaleTimeString()}, valid for 10 minutes
+            
+            {countdown > 0 && (
+              <p className="text-center text-sm text-gray-500 mt-2">
+                Resend code in {countdown} seconds
               </p>
+            )}
+            
+            {allowResend && (
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                className="text-center w-full text-sm text-auth-primary mt-2 hover:underline"
+                disabled={loading}
+              >
+                Resend verification code
+              </button>
             )}
           </div>
           
-          <div className="flex flex-col space-y-2">
-            <Button
-              type="submit"
-              className="auth-button"
-              disabled={loading}
-            >
-              {loading ? "Verifying..." : "Verify OTP"}
-            </Button>
-            
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOtpSent(false)}
-                disabled={loading}
-                className="w-full"
-              >
-                Change Number
-              </Button>
-              
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleResendOTP}
-                disabled={loading}
-                className="w-full"
-              >
-                Resend OTP
-              </Button>
-            </div>
-          </div>
+          <Button
+            type="submit"
+            className="auth-button"
+            disabled={loading}
+          >
+            {loading ? "Verifying..." : "Verify"}
+          </Button>
         </form>
       )}
       
       <div className="mt-4 text-center">
-        <p className="text-auth-muted">
-          Want to use email instead?{" "}
-          <button onClick={onToggleForm} className="auth-link" disabled={loading}>
-            Sign In with Email
-          </button>
-        </p>
+        <button 
+          onClick={otpSent ? () => setOtpSent(false) : onToggleForm} 
+          className="flex items-center justify-center mx-auto text-auth-muted hover:text-auth-text"
+          disabled={loading}
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          {otpSent ? "Change Phone Number" : "Back to Email Sign In"}
+        </button>
       </div>
     </div>
   );
