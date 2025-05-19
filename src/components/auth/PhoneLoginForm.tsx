@@ -5,12 +5,6 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
 import { signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-  InputOTPSeparator
-} from '../ui/input-otp';
 
 type PhoneLoginFormProps = {
   onToggleForm: () => void;
@@ -71,6 +65,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       await signInWithPhone(phone);
       setIsOtpSent(true);
       setCountdown(600); // 10 minutes expiry
+      setOtpToken(''); // Reset OTP if resending
       toast({
         title: "Success",
         description: "OTP sent to your phone",
@@ -93,6 +88,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       setResending(true);
       await signInWithPhone(phone);
       setCountdown(600); // 10 minutes expiry
+      setOtpToken(''); // Reset OTP if resending
       toast({
         title: "Success",
         description: "OTP sent to your phone",
@@ -130,11 +126,26 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       // Successful verification will trigger auth state change
       // Auth context will handle redirect
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to verify OTP",
-        variant: "destructive",
-      });
+      console.error('Verification error:', error);
+      
+      // Check for token expiration error
+      if (error.message?.includes('expired') || error.message?.includes('invalid')) {
+        toast({
+          title: "Error",
+          description: "Your verification code has expired or is invalid. Please request a new one.",
+          variant: "destructive",
+        });
+        // Auto-trigger resend if token expired
+        if (countdown <= 0) {
+          setTimeout(() => handleResendOtp(), 1000);
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to verify OTP",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -146,10 +157,6 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
     if (value === '' || value === '+' || /^\+[0-9]*$/.test(value)) {
       setPhone(value);
     }
-  };
-  
-  const handleOtpChange = (value: string) => {
-    setOtpToken(value);
   };
 
   return (
@@ -199,25 +206,37 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
               )}
             </div>
             
-            <InputOTP
+            <Input
+              id="otp"
+              type="text"
+              inputMode="numeric"
+              autoFocus
               value={otpToken}
-              onChange={handleOtpChange}
+              onChange={(e) => setOtpToken(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+              placeholder="Enter 6-digit code"
+              className="auth-input text-center text-2xl tracking-widest"
               maxLength={6}
-              render={({ slots }) => (
-                <InputOTPGroup>
-                  {slots.map((slot, index) => (
-                    <React.Fragment key={index}>
-                      <InputOTPSlot index={index} className="w-10 h-10" />
-                      {index !== slots.length - 1 && index % 3 === 2 && (
-                        <InputOTPSeparator />
-                      )}
-                    </React.Fragment>
-                  ))}
-                </InputOTPGroup>
-              )}
+              pattern="[0-9]*"
+              disabled={loading}
+              required
             />
             
-            <div className="text-center mt-2">
+            <div className="flex justify-center mt-4">
+              <div className="flex gap-2 items-center justify-center">
+                {[...Array(6)].map((_, i) => (
+                  <div 
+                    key={i}
+                    className={`w-10 h-12 flex items-center justify-center border rounded-md 
+                      ${i < otpToken.length ? 'border-primary bg-primary/10' : 'border-input'}`}
+                  >
+                    {otpToken[i] || (i === otpToken.length ? 
+                      <div className="w-1 h-6 bg-primary animate-pulse"></div> : '')}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="text-center mt-4">
               <p className="text-sm">
                 {countdown === 0 ? (
                   <Button 

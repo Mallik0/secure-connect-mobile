@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
@@ -133,11 +134,21 @@ export const checkSessionValidity = async () => {
 
 // Phone authentication functions
 export const signInWithPhone = async (phone: string) => {
+  // Clear any existing OTP for this phone number first
+  try {
+    await supabase.auth.resetPasswordForEmail(phone, {
+      redirectTo: window.location.origin
+    });
+  } catch (error) {
+    // Ignore errors here - this is just to clear existing OTPs
+    console.log("Preparing for fresh OTP");
+  }
+  
+  // Now send the new OTP
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
       channel: 'sms',
-      // Removed expiresIn parameter as it's not supported in this context
     }
   });
 
