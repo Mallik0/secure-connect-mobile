@@ -15,6 +15,8 @@ type User = {
   firstName: string;
   lastName: string;
   phone: string;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
 } | null;
 
 type AuthContextType = {
@@ -24,6 +26,7 @@ type AuthContextType = {
   signUp: (email: string, password: string, firstName: string, lastName: string, phone: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  verifyUserAccount: () => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,6 +37,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
   const initialCheckDone = useRef(false);
   const processingAuthChange = useRef(false);
+
+  // Check if user has both email and phone verified
+  const verifyUserAccount = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) return false;
+      
+      // Check user profile
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+      
+      if (error || !data) {
+        console.error('Error fetching user profile for verification:', error);
+        return false;
+      }
+      
+      // Check if email is confirmed
+      const isEmailVerified = currentUser.email_confirmed_at != null;
+      
+      // Check if phone exists in the profile
+      const isPhoneVerified = data.phone && data.phone.length > 0;
+      
+      // Update user state with verification status
+      if (user) {
+        setUser({
+          ...user,
+          isEmailVerified,
+          isPhoneVerified
+        });
+      }
+      
+      // User is fully verified if both email and phone are verified
+      return isEmailVerified && isPhoneVerified;
+    } catch (err) {
+      console.error('Error checking verification status:', err);
+      return false;
+    }
+  };
 
   // Initial auth check - only runs once
   useEffect(() => {
@@ -68,12 +112,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Error fetching user profile:', profileError);
             setUser(null);
           } else {
+            // Check email verification status
+            const isEmailVerified = currentUser.email_confirmed_at != null;
+            // Check if phone exists in the profile
+            const isPhoneVerified = data.phone && data.phone.length > 0;
+            
             setUser({
               id: currentUser.id,
               email: data.email || currentUser.email || '',
               firstName: data.first_name,
               lastName: data.last_name,
-              phone: data.phone
+              phone: data.phone,
+              isEmailVerified,
+              isPhoneVerified
             });
           }
         } else {
@@ -95,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log('Auth state changed:', event);
         
         // Avoid multiple rapid state changes
@@ -144,24 +195,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       console.error('Error creating user profile:', createError);
                       setUser(null);
                     } else {
+                      // Check email verification status
+                      const isEmailVerified = session.user.email_confirmed_at != null;
+                      // For a new profile, we assume phone is not verified yet
+                      const isPhoneVerified = false;
+                      
                       setUser({
                         id: session.user.id,
                         email: session.user.email || '',
                         firstName: metadata?.first_name || '',
                         lastName: metadata?.last_name || '',
-                        phone: session.user.phone || metadata?.phone || ''
+                        phone: session.user.phone || metadata?.phone || '',
+                        isEmailVerified,
+                        isPhoneVerified
                       });
                     }
                   } else {
                     setUser(null);
                   }
                 } else if (data) {
+                  // Check email verification status
+                  const isEmailVerified = session.user.email_confirmed_at != null;
+                  // Check if phone exists in the profile
+                  const isPhoneVerified = data.phone && data.phone.length > 0;
+                  
                   setUser({
                     id: session.user.id,
                     email: data.email || session.user.email || '',
                     firstName: data.first_name,
                     lastName: data.last_name,
-                    phone: data.phone || session.user.phone || ''
+                    phone: data.phone || session.user.phone || '',
+                    isEmailVerified,
+                    isPhoneVerified
                   });
                 }
               }
@@ -236,7 +301,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     signUp,
     signIn,
-    logout
+    logout,
+    verifyUserAccount
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

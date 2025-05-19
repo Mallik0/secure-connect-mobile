@@ -14,10 +14,11 @@ type AuthMode = 'login' | 'register' | 'phone';
 
 const Auth: React.FC = () => {
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const { user, loading } = useAuth();
+  const { user, loading, verifyUserAccount } = useAuth();
   const navigate = useNavigate();
   const [showEmailAlert, setShowEmailAlert] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [showVerificationNeeded, setShowVerificationNeeded] = useState(false);
   
   // Check URL parameters for registration success indicator
   useEffect(() => {
@@ -35,9 +36,17 @@ const Auth: React.FC = () => {
   
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      // Check if user has completed all verification steps
+      verifyUserAccount().then(isVerified => {
+        if (isVerified) {
+          navigate('/dashboard');
+        } else {
+          // User is logged in but not fully verified
+          setShowVerificationNeeded(true);
+        }
+      });
     }
-  }, [user, navigate]);
+  }, [user, navigate, verifyUserAccount]);
 
   if (loading) {
     return (
@@ -70,6 +79,32 @@ const Auth: React.FC = () => {
               <AlertDescription>
                 <p>We've sent a verification link to <strong>{userEmail}</strong>.</p> 
                 <p className="mt-1">Please check your email and verify your account before logging in.</p>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+        
+        {showVerificationNeeded && user && (
+          <div className="mb-4">
+            <Alert className="bg-yellow-50 border-yellow-200">
+              <AlertTitle className="flex justify-between items-center">
+                <span>Account Verification Required</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0" 
+                  onClick={() => setShowVerificationNeeded(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </AlertTitle>
+              <AlertDescription>
+                {!user.isEmailVerified && (
+                  <p className="mb-2">Please check your email and verify your email address.</p>
+                )}
+                {!user.isPhoneVerified && (
+                  <p>Please add and verify your phone number in your profile.</p>
+                )}
               </AlertDescription>
             </Alert>
           </div>

@@ -6,6 +6,7 @@ import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
 import { signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../ui/input-otp';
+import { Alert, AlertDescription } from '../ui/alert';
 
 type PhoneLoginFormProps = {
   onToggleForm: () => void;
@@ -18,6 +19,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [resending, setResending] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Handle the countdown timer
   useEffect(() => {
@@ -42,6 +44,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     
     if (!phone) {
       toast({
@@ -72,6 +75,9 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
         description: "OTP sent to your phone",
       });
     } catch (error: any) {
+      console.error("Phone login error:", error);
+      setLoginError(error.message || "Failed to send OTP");
+      
       toast({
         title: "Error",
         description: error.message || "Failed to send OTP",
@@ -84,6 +90,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
   
   const handleResendOtp = async () => {
     if (countdown > 0) return;
+    setLoginError(null);
     
     try {
       setResending(true);
@@ -95,6 +102,9 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
         description: "OTP sent to your phone",
       });
     } catch (error: any) {
+      console.error("Resend OTP error:", error);
+      setLoginError(error.message || "Failed to resend OTP");
+      
       toast({
         title: "Error",
         description: error.message || "Failed to resend OTP",
@@ -107,6 +117,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     
     if (!otpToken || otpToken.length !== 6) {
       toast({
@@ -128,6 +139,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       // Auth context will handle redirect
     } catch (error: any) {
       console.error('Verification error:', error);
+      setLoginError(error.message || "Failed to verify OTP");
       
       // Check for token expiration error
       if (error.message?.includes('expired') || error.message?.includes('invalid')) {
@@ -164,6 +176,12 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
   return (
     <div className="auth-card">
       <h2 className="auth-title">Sign In with Phone</h2>
+      
+      {loginError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{loginError}</AlertDescription>
+        </Alert>
+      )}
       
       {!isOtpSent ? (
         <form onSubmit={handleSendOtp}>

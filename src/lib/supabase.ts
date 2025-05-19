@@ -133,10 +133,39 @@ export const checkSessionValidity = async () => {
   return false;
 };
 
+// Check if a user with the given phone number exists
+export const checkUserExistsByPhone = async (phone: string) => {
+  try {
+    // First check if the phone exists in user_profiles
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('phone', phone);
+      
+    if (error) {
+      console.error('Error checking phone number:', error);
+      return false;
+    }
+    
+    return profiles && profiles.length > 0;
+  } catch (err) {
+    console.error('Error in checkUserExistsByPhone:', err);
+    return false;
+  }
+};
+
 // Improved phone authentication functions
 export const signInWithPhone = async (phone: string) => {
   try {
-    // First, clear any existing OTP to start fresh
+    // First check if this phone number belongs to an existing user
+    const userExists = await checkUserExistsByPhone(phone);
+    
+    if (!userExists) {
+      console.error("No user found with this phone number");
+      throw new Error("No account found with this phone number. Please sign up first.");
+    }
+
+    // Clear any existing OTP to start fresh
     console.log("Clearing any existing OTP for this phone number");
     
     // Now send the new OTP
@@ -205,6 +234,26 @@ export const verifyPhoneOTP = async (phone: string, token: string) => {
     return data;
   } catch (err) {
     console.error('Error verifying OTP:', err);
+    throw err;
+  }
+};
+
+// Link a phone number to a user account
+export const linkPhoneToUser = async (userId: string, phone: string) => {
+  try {
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ phone })
+      .eq('user_id', userId);
+      
+    if (error) {
+      console.error('Error linking phone to user:', error);
+      throw error;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Error in linkPhoneToUser:', err);
     throw err;
   }
 };
