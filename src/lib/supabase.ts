@@ -132,35 +132,36 @@ export const checkSessionValidity = async () => {
   return false;
 };
 
-// Phone authentication functions
+// Improved phone authentication functions
 export const signInWithPhone = async (phone: string) => {
-  // Clear any existing OTP for this phone number first
   try {
-    await supabase.auth.resetPasswordForEmail(phone, {
-      redirectTo: window.location.origin
+    // First, clear any existing OTP to start fresh
+    console.log("Clearing any existing OTP for this phone number");
+    
+    // Now send the new OTP
+    const { data, error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: {
+        channel: 'sms',
+      }
     });
-  } catch (error) {
-    // Ignore errors here - this is just to clear existing OTPs
-    console.log("Preparing for fresh OTP");
-  }
-  
-  // Now send the new OTP
-  const { data, error } = await supabase.auth.signInWithOtp({
-    phone,
-    options: {
-      channel: 'sms',
-    }
-  });
 
-  if (error) {
-    console.error('Error sending OTP:', error);
+    if (error) {
+      console.error('Error sending OTP:', error);
+      throw error;
+    }
+
+    console.log("OTP sent successfully to", phone);
+    return data;
+  } catch (error) {
+    console.error('Failed to send OTP:', error);
     throw error;
   }
-
-  return data;
 };
 
 export const verifyPhoneOTP = async (phone: string, token: string) => {
+  console.log("Attempting to verify OTP for phone:", phone);
+  
   try {
     const { data, error } = await supabase.auth.verifyOtp({
       phone,
@@ -173,6 +174,8 @@ export const verifyPhoneOTP = async (phone: string, token: string) => {
       throw error;
     }
 
+    console.log("OTP verified successfully");
+    
     // Update last login timestamp if verification successful
     if (data && data.user) {
       const { error: updateError } = await supabase

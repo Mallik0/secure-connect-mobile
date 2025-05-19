@@ -150,7 +150,8 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       setLoading(false);
     }
   };
-  
+
+  // Improved phone input handling
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Allow only digits and + character
     const value = e.target.value;
@@ -167,16 +168,21 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
         <form onSubmit={handleSendOtp}>
           <div className="mb-6">
             <label htmlFor="phone" className="auth-label">Phone Number</label>
-            <Input
-              id="phone"
-              type="tel"
-              value={phone}
-              onChange={handlePhoneChange}
-              placeholder="+1234567890"
-              className="auth-input"
-              disabled={loading}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={handlePhoneChange}
+                placeholder="+1234567890"
+                className="auth-input pl-8"
+                disabled={loading}
+                required
+                autoFocus
+                aria-label="Phone number"
+              />
+              <Phone className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               Include country code (e.g., +1 for US)
             </p>
