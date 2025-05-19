@@ -1,12 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
 import PhoneLoginForm from '../components/auth/PhoneLoginForm';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useEffect } from 'react';
 import { Loader } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
+import { Button } from '../components/ui/button';
+import { X } from 'lucide-react';
 
 type AuthMode = 'login' | 'register' | 'phone';
 
@@ -14,6 +16,22 @@ const Auth: React.FC = () => {
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [showEmailAlert, setShowEmailAlert] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  
+  // Check URL parameters for registration success indicator
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const registered = urlParams.get('registered');
+    const email = urlParams.get('email');
+    
+    if (registered === 'true' && email) {
+      setShowEmailAlert(true);
+      setUserEmail(decodeURIComponent(email));
+      // Clean URL without refreshing the page
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
   
   useEffect(() => {
     if (user) {
@@ -34,7 +52,29 @@ const Auth: React.FC = () => {
   
   return (
     <div className="auth-container">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md relative">
+        {showEmailAlert && (
+          <div className="absolute top-0 left-0 right-0 mb-4 z-10 transform -translate-y-full">
+            <Alert className="bg-yellow-50 border-yellow-200">
+              <AlertTitle className="flex justify-between items-center">
+                <span>Email Verification Required</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0" 
+                  onClick={() => setShowEmailAlert(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </AlertTitle>
+              <AlertDescription>
+                <p>We've sent a verification link to <strong>{userEmail}</strong>.</p> 
+                <p className="mt-1">Please check your email and verify your account before logging in.</p>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+        
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-auth-primary">Secure App</h1>
           <p className="mt-2 text-auth-muted">Your trusted authentication service</p>

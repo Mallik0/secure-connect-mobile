@@ -30,6 +30,7 @@ export const signUpWithEmail = async (
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    phone,  // Add phone to the user metadata
     options: {
       data: {
         first_name: firstName,
@@ -37,7 +38,7 @@ export const signUpWithEmail = async (
         phone: phone,
         created_at: new Date().toISOString(),
       },
-      emailRedirectTo: window.location.origin
+      emailRedirectTo: `${window.location.origin}?registered=true&email=${encodeURIComponent(email)}`
     }
   });
 
@@ -178,14 +179,26 @@ export const verifyPhoneOTP = async (phone: string, token: string) => {
     
     // Update last login timestamp if verification successful
     if (data && data.user) {
-      const { error: updateError } = await supabase
+      // Ensure the phone number is also stored in user_profiles
+      // This fixes the issue where phone login doesn't update the profile
+      const { error: profileError } = await supabase
         .from('user_profiles')
-        .update({ last_login: new Date().toISOString() })
-        .eq('user_id', data.user.id);
+        .upsert(
+          { 
+            user_id: data.user.id,
+            phone: phone,
+            email: data.user.email || '',
+            first_name: data.user.user_metadata.first_name || '',
+            last_name: data.user.user_metadata.last_name || '',
+            last_login: new Date().toISOString(),
+            created_at: new Date().toISOString()
+          }, 
+          { onConflict: 'user_id' }
+        );
 
-      if (updateError) {
-        console.error('Error updating last login:', updateError);
-        // Not throwing here as the login was successful
+      if (profileError) {
+        console.error('Error updating user profile after OTP verification:', profileError);
+        // Not throwing here as the verification was successful
       }
     }
 

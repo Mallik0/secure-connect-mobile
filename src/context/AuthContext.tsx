@@ -32,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const authCheckCompleted = useRef(false);
   const initialCheckDone = useRef(false);
   const processingAuthChange = useRef(false);
 
@@ -71,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setUser({
               id: currentUser.id,
-              email: data.email,
+              email: data.email || currentUser.email || '',
               firstName: data.first_name,
               lastName: data.last_name,
               phone: data.phone
@@ -110,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (event === 'SIGNED_OUT') {
           setUser(null);
           processingAuthChange.current = false;
-        } else if (event === 'SIGNED_IN' && session?.user) {
+        } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
           // Delay auth state update to prevent rapid successive updates
           setTimeout(async () => {
             try {
@@ -121,17 +120,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   .select('*')
                   .eq('user_id', session.user.id)
                   .single();
-                  
-                if (profileError || !data) {
+
+                if (profileError) {
                   console.error('Error fetching user profile:', profileError);
-                  setUser(null);
-                } else {
+                  
+                  // If profile not found, try to create it from user metadata
+                  // This helps fix the phone login issue
+                  if (profileError.code === 'PGRST116') {
+                    const metadata = session.user.user_metadata;
+                    const { error: createError } = await supabase
+                      .from('user_profiles')
+                      .insert({
+                        user_id: session.user.id,
+                        email: session.user.email || '',
+                        first_name: metadata?.first_name || '',
+                        last_name: metadata?.last_name || '',
+                        phone: session.user.phone || metadata?.phone || '',
+                        created_at: new Date().toISOString(),
+                        last_login: new Date().toISOString()
+                      });
+                      
+                    if (createError) {
+                      console.error('Error creating user profile:', createError);
+                      setUser(null);
+                    } else {
+                      setUser({
+                        id: session.user.id,
+                        email: session.user.email || '',
+                        firstName: metadata?.first_name || '',
+                        lastName: metadata?.last_name || '',
+                        phone: session.user.phone || metadata?.phone || ''
+                      });
+                    }
+                  } else {
+                    setUser(null);
+                  }
+                } else if (data) {
                   setUser({
                     id: session.user.id,
-                    email: data.email,
+                    email: data.email || session.user.email || '',
                     firstName: data.first_name,
                     lastName: data.last_name,
-                    phone: data.phone
+                    phone: data.phone || session.user.phone || ''
                   });
                 }
               }
@@ -140,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } finally {
               processingAuthChange.current = false;
             }
-          }, 100); // Add a delay to prevent multiple rapid auth changes
+          }, 100);
         } else {
           processingAuthChange.current = false;
         }

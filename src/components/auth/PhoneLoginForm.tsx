@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
 import { signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '../ui/input-otp';
 
 type PhoneLoginFormProps = {
   onToggleForm: () => void;
@@ -212,35 +213,20 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
               )}
             </div>
             
-            <Input
-              id="otp"
-              type="text"
-              inputMode="numeric"
-              autoFocus
-              value={otpToken}
-              onChange={(e) => setOtpToken(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-              placeholder="Enter 6-digit code"
-              className="auth-input text-center text-2xl tracking-widest"
+            <InputOTP
               maxLength={6}
-              pattern="[0-9]*"
+              value={otpToken}
+              onChange={(value) => setOtpToken(value)}
+              containerClassName="gap-2 justify-center"
               disabled={loading}
-              required
-            />
-            
-            <div className="flex justify-center mt-4">
-              <div className="flex gap-2 items-center justify-center">
-                {[...Array(6)].map((_, i) => (
-                  <div 
-                    key={i}
-                    className={`w-10 h-12 flex items-center justify-center border rounded-md 
-                      ${i < otpToken.length ? 'border-primary bg-primary/10' : 'border-input'}`}
-                  >
-                    {otpToken[i] || (i === otpToken.length ? 
-                      <div className="w-1 h-6 bg-primary animate-pulse"></div> : '')}
-                  </div>
+              autoFocus
+            >
+              <InputOTPGroup>
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <InputOTPSlot key={i} index={i} className="w-10 h-12 text-center" />
                 ))}
-              </div>
-            </div>
+              </InputOTPGroup>
+            </InputOTP>
             
             <div className="text-center mt-4">
               <p className="text-sm">
