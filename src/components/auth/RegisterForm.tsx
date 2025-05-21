@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
@@ -65,8 +66,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     try {
       setVerifying(true);
       
-      // For registration, we'll use a custom OTP approach since we're just verifying
-      // not signing in
+      // For registration, we won't create a user yet - just send the OTP for verification
       const { data, error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
@@ -143,20 +143,19 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     try {
       setVerifying(true);
       
-      // For registration, we'll just verify the OTP but not complete the sign in
+      // Verify the OTP without trying to create a user or update user_profiles
       const { data, error } = await supabase.auth.verifyOtp({
         phone,
         token: otpToken,
         type: 'sms',
-        // Remove the shouldCreateUser option as it's not supported
       });
       
       if (error) {
         throw error;
       }
       
-      // If verification is successful but we don't want to complete sign-in yet
-      // we'll just mark the phone as verified for registration
+      // If verification is successful, we mark the phone as verified locally
+      // but don't complete the sign-in process yet
       setPhoneVerified(true);
       setIsVerifyingPhone(false);
       toast({
@@ -165,6 +164,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
       });
       
       // Sign out any temporary session created during phone verification
+      // This is important so we can start fresh with the full registration
       await supabase.auth.signOut();
       
     } catch (error: any) {
