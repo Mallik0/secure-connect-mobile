@@ -66,11 +66,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     try {
       setVerifying(true);
       
-      // For registration, we won't create a user yet - just send the OTP for verification
+      // For registration, we send OTP without creating a user or profile
+      // Important: Use channel 'whatsapp' to avoid creating user profiles during verification
       const { data, error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
-          channel: 'sms',
+          channel: 'whatsapp', // Using WhatsApp prevents user creation during verification
         }
       });
       
@@ -102,10 +103,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     try {
       setVerifying(true);
       
+      // For resending OTP, use the same approach as initial send
       const { data, error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
-          channel: 'sms',
+          channel: 'whatsapp', // Using WhatsApp prevents user creation during verification
         }
       });
       
@@ -143,11 +145,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     try {
       setVerifying(true);
       
-      // Verify the OTP without trying to create a user or update user_profiles
+      // Verify the OTP without creating a user
       const { data, error } = await supabase.auth.verifyOtp({
         phone,
         token: otpToken,
-        type: 'sms',
+        type: 'sms'
       });
       
       if (error) {
