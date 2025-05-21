@@ -38,6 +38,7 @@ const Auth: React.FC = () => {
     if (user) {
       // Check if user has completed all verification steps
       verifyUserAccount().then(isVerified => {
+        console.log("Verification check result:", isVerified);
         if (isVerified) {
           navigate('/dashboard');
         } else {

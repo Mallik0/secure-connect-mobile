@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Check if email is confirmed
       const isEmailVerified = currentUser.email_confirmed_at != null;
       
-      // Check if phone exists in the profile
+      // Check if phone exists and is non-empty in the profile
       const isPhoneVerified = data.phone && data.phone.length > 0;
       
       // Update user state with verification status
@@ -67,9 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({
           ...user,
           isEmailVerified,
-          isPhoneVerified
+          isPhoneVerified,
+          phone: data.phone || '' // Update the phone in case it was updated
         });
       }
+      
+      console.log("Verification status:", { isEmailVerified, isPhoneVerified, phone: data.phone });
       
       // User is fully verified if both email and phone are verified
       return isEmailVerified && isPhoneVerified;
@@ -252,10 +255,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       setError(null);
       
-      await signUpWithEmail(email, password, firstName, lastName, phone);
+      console.log(`Signing up user with email: ${email} and phone: ${phone}`);
+      
+      const data = await signUpWithEmail(email, password, firstName, lastName, phone);
+      
+      console.log("Signup successful, user data:", data);
       
       // After signup, we'll wait for the user to verify their email before logging them in
-      // or directly sign them in if email verification is not required in your Supabase setup
     } catch (err: any) {
       setError(err.message || 'Failed to sign up');
       throw err;

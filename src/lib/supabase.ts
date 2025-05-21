@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
@@ -25,17 +24,15 @@ export const signUpWithEmail = async (
   lastName: string, 
   phone: string
 ) => {
-  // Create the new user - we no longer need to check for existing users
-  // as the trigger will handle profile creation
+  // Create the new user with phone included in user metadata
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    phone,  // Add phone to the user metadata
     options: {
       data: {
         first_name: firstName,
         last_name: lastName,
-        phone: phone,
+        phone: phone, // Ensure phone is included in user metadata
         created_at: new Date().toISOString(),
       },
       emailRedirectTo: `${window.location.origin}?registered=true&email=${encodeURIComponent(email)}`
@@ -45,6 +42,32 @@ export const signUpWithEmail = async (
   if (error) {
     console.error('Error signing up:', error);
     throw error;
+  }
+
+  // If user was created successfully, ensure we also create/update their profile with the phone number
+  if (data && data.user) {
+    try {
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: data.user.id,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          phone: phone, // Make sure phone is properly saved in user_profiles
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (profileError) {
+        console.error('Error updating user profile after signup:', profileError);
+        // Not throwing here as the signup was successful
+      } else {
+        console.log('User profile created/updated with phone number:', phone);
+      }
+    } catch (profileErr) {
+      console.error('Exception when updating profile after signup:', profileErr);
+    }
   }
 
   return data;
@@ -136,6 +159,11 @@ export const checkSessionValidity = async () => {
 // Check if a user with the given phone number exists
 export const checkUserExistsByPhone = async (phone: string) => {
   try {
+    if (!phone || phone.trim() === '') {
+      console.error('Empty phone number provided to checkUserExistsByPhone');
+      return false;
+    }
+    
     // First check if the phone exists in user_profiles
     const { data: profiles, error } = await supabase
       .from('user_profiles')
@@ -208,26 +236,48 @@ export const verifyPhoneOTP = async (phone: string, token: string) => {
     
     // Update last login timestamp if verification successful
     if (data && data.user) {
-      // Ensure the phone number is also stored in user_profiles
-      // This fixes the issue where phone login doesn't update the profile
-      const { error: profileError } = await supabase
+      // Make sure we have the user's profile data
+      const { data: profileData, error: profileQueryError } = await supabase
         .from('user_profiles')
-        .upsert(
-          { 
-            user_id: data.user.id,
-            phone: phone,
-            email: data.user.email || '',
-            first_name: data.user.user_metadata.first_name || '',
-            last_name: data.user.user_metadata.last_name || '',
-            last_login: new Date().toISOString(),
-            created_at: new Date().toISOString()
-          }, 
-          { onConflict: 'user_id' }
-        );
+        .select('*')
+        .eq('user_id', data.user.id)
+        .single();
+      
+      if (profileQueryError) {
+        console.error('Error fetching user profile after OTP verification:', profileQueryError);
+        
+        // If profile doesn't exist, try to create it from user metadata
+        if (profileQueryError.code === 'PGRST116') {
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .upsert({ 
+              user_id: data.user.id,
+              phone: phone,
+              email: data.user.email || '',
+              first_name: data.user.user_metadata.first_name || '',
+              last_name: data.user.user_metadata.last_name || '',
+              last_login: new Date().toISOString(),
+              created_at: new Date().toISOString()
+            }, 
+            { onConflict: 'user_id' });
 
-      if (profileError) {
-        console.error('Error updating user profile after OTP verification:', profileError);
-        // Not throwing here as the verification was successful
+          if (profileError) {
+            console.error('Error creating user profile after OTP verification:', profileError);
+          }
+        }
+      } else if (profileData) {
+        // Profile exists, update it with the phone number (in case it's missing)
+        const { error: updateError } = await supabase
+          .from('user_profiles')
+          .update({ 
+            phone: phone,
+            last_login: new Date().toISOString() 
+          })
+          .eq('user_id', data.user.id);
+
+        if (updateError) {
+          console.error('Error updating phone in user profile after OTP verification:', updateError);
+        }
       }
     }
 
@@ -241,6 +291,26 @@ export const verifyPhoneOTP = async (phone: string, token: string) => {
 // Link a phone number to a user account
 export const linkPhoneToUser = async (userId: string, phone: string) => {
   try {
+    console.log(`Linking phone ${phone} to user ${userId}`);
+    
+    // First check if the phone number is already in use
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('phone', phone)
+      .neq('user_id', userId);
+      
+    if (checkError) {
+      console.error('Error checking existing phone:', checkError);
+      throw checkError;
+    }
+    
+    if (existingUsers && existingUsers.length > 0) {
+      console.error('Phone number already linked to another user');
+      throw new Error('This phone number is already linked to another account');
+    }
+    
+    // Update the profile with the phone
     const { error } = await supabase
       .from('user_profiles')
       .update({ phone })

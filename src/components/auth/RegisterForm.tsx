@@ -65,7 +65,20 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     
     try {
       setVerifying(true);
-      await signInWithPhone(phone);
+      
+      // For registration, we'll use a custom OTP approach since we're just verifying
+      // not signing in
+      const { data, error } = await supabase.auth.signInWithOtp({
+        phone,
+        options: {
+          channel: 'sms',
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
       setOtpSent(true);
       setCountdown(600); // 10 minutes expiry
       setOtpToken('');
@@ -89,7 +102,18 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     
     try {
       setVerifying(true);
-      await signInWithPhone(phone);
+      
+      const { data, error } = await supabase.auth.signInWithOtp({
+        phone,
+        options: {
+          channel: 'sms',
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
       setCountdown(600);
       setOtpToken('');
       toast({
@@ -119,13 +143,33 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     
     try {
       setVerifying(true);
-      await verifyPhoneOTP(phone, otpToken);
+      
+      // For registration, we'll just verify the OTP but not complete the sign in
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone,
+        token: otpToken,
+        type: 'sms',
+        options: {
+          shouldCreateUser: false // Don't create user here, we'll do it in the signup step
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // If verification is successful but we don't want to complete sign-in yet
+      // we'll just mark the phone as verified for registration
       setPhoneVerified(true);
       setIsVerifyingPhone(false);
       toast({
         title: "Success",
         description: "Phone number verified successfully",
       });
+      
+      // Sign out any temporary session created during phone verification
+      await supabase.auth.signOut();
+      
     } catch (error: any) {
       if (error.message?.includes('expired') || error.message?.includes('invalid')) {
         toast({
@@ -183,6 +227,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     }
 
     try {
+      // Now pass the verified phone number to signUp
       await signUp(email, password, firstName, lastName, phone);
       toast({
         title: "Success",
