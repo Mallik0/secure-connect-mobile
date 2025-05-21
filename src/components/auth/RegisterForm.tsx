@@ -1,13 +1,12 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from '../ui/use-toast';
 import { Eye, EyeOff, Phone } from 'lucide-react';
-import { signInWithPhone, verifyPhoneOTP } from '../../lib/supabase';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../ui/input-otp';
 import { Alert, AlertDescription } from '../ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 
 type RegisterFormProps = {
   onToggleForm: () => void;
