@@ -148,9 +148,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
         phone,
         token: otpToken,
         type: 'sms',
-        options: {
-          shouldCreateUser: false // Don't create user here, we'll do it in the signup step
-        }
+        // Remove the shouldCreateUser option as it's not supported
       });
       
       if (error) {
