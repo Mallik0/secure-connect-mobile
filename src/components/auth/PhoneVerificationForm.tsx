@@ -33,12 +33,12 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
     try {
       setVerifying(true);
       
-      // Use SMS for verification (instead of WhatsApp)
+      // Use SMS for verification without creating a user
       const { data, error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
-          channel: 'sms', // Changed from 'whatsapp' to 'sms'
-          shouldCreateUser: false // This prevents creating a user record during verification
+          channel: 'sms',
+          shouldCreateUser: false // Explicitly prevent user creation
         }
       });
       
@@ -71,12 +71,12 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
     try {
       setVerifying(true);
       
-      // For resending OTP, use SMS
+      // For resending OTP, use SMS without user creation
       const { data, error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
-          channel: 'sms', // Changed from 'whatsapp' to 'sms'
-          shouldCreateUser: false // Prevent user creation during verification
+          channel: 'sms',
+          shouldCreateUser: false
         }
       });
       
@@ -114,7 +114,7 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
     try {
       setVerifying(true);
       
-      // Verify the OTP without creating a user
+      // Verify the OTP - this only validates the phone number without creating a user
       const { data, error } = await supabase.auth.verifyOtp({
         phone,
         token: otpToken,
@@ -132,7 +132,6 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
       });
       
       // Sign out any temporary session created during phone verification
-      // This is important so we can start fresh with the full registration
       await supabase.auth.signOut();
       
       // Notify parent component that verification succeeded
