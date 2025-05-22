@@ -38,14 +38,11 @@ export const signInWithPhone = async (phone: string) => {
       throw new Error("No account found with this phone number. Please sign up first.");
     }
 
-    // Clear any existing OTP to start fresh
-    console.log("Clearing any existing OTP for this phone number");
-    
-    // Now send the new OTP
+    // Now send the OTP via SMS
     const { data, error } = await supabase.auth.signInWithOtp({
       phone,
       options: {
-        channel: 'sms',
+        channel: 'sms', // Using SMS instead of WhatsApp
       }
     });
 

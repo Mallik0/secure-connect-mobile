@@ -72,7 +72,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       setOtpToken(''); // Reset OTP if resending
       toast({
         title: "Success",
-        description: "OTP sent to your phone",
+        description: "OTP sent to your phone via SMS",
       });
     } catch (error: any) {
       console.error("Phone login error:", error);
@@ -99,7 +99,7 @@ const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onToggleForm }) => {
       setOtpToken(''); // Reset OTP if resending
       toast({
         title: "Success",
-        description: "OTP sent to your phone",
+        description: "OTP sent to your phone via SMS",
       });
     } catch (error: any) {
       console.error("Resend OTP error:", error);

@@ -33,11 +33,12 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
     try {
       setVerifying(true);
       
-      // Important: Use channel 'whatsapp' to avoid creating user profiles during verification
+      // Use SMS for verification (instead of WhatsApp)
       const { data, error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
-          channel: 'whatsapp', // Using WhatsApp prevents user creation during verification
+          channel: 'sms', // Changed from 'whatsapp' to 'sms'
+          shouldCreateUser: false // This prevents creating a user record during verification
         }
       });
       
@@ -50,9 +51,10 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
       setOtpToken('');
       toast({
         title: "Success",
-        description: "OTP sent to your phone",
+        description: "OTP sent to your phone via SMS",
       });
     } catch (error: any) {
+      console.error("Failed to send OTP:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to send OTP",
@@ -69,11 +71,12 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
     try {
       setVerifying(true);
       
-      // For resending OTP, use the same approach as initial send
+      // For resending OTP, use SMS
       const { data, error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
-          channel: 'whatsapp', // Using WhatsApp prevents user creation during verification
+          channel: 'sms', // Changed from 'whatsapp' to 'sms'
+          shouldCreateUser: false // Prevent user creation during verification
         }
       });
       
@@ -85,7 +88,7 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
       setOtpToken('');
       toast({
         title: "Success",
-        description: "OTP resent to your phone",
+        description: "OTP resent to your phone via SMS",
       });
     } catch (error: any) {
       toast({
@@ -158,7 +161,7 @@ const PhoneVerificationForm: React.FC<PhoneVerificationFormProps> = ({
     return (
       <div>
         <p className="text-center mb-4 text-auth-muted">
-          We'll send a verification code to {phone}
+          We'll send a verification code to {phone} via SMS
         </p>
         <Button
           onClick={handleSendOtp}
