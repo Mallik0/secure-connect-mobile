@@ -2,7 +2,7 @@
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-# This project demonstrates a secure authentication mechanism for login and sign up using supabase as the backend
+## This project demonstrates a secure authentication mechanism for login and sign up using supabase as the backend
 
 Follow these steps:
 
